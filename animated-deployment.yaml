@@ -1,24 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: guestbook-v2
+  name: animatedbook
   labels:
-    app: guestbook
-    version: "2.0"
+    app: animatedbook
 spec:
   selector:
     matchLabels:
-      app: guestbook
+      app: animatedbook
   replicas: 3
   template:
     metadata:
       labels:
-        app: guestbook
-        version: "2.0"
+        app: animatedbook
     spec:
       containers:
-      - name: guestbook
-        image: ibmcom/guestbook:v2
+      - name: animatedbook
+        image: linsun/animatedbook
         resources:
           requests:
             cpu: 100m
