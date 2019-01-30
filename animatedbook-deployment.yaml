@@ -8,7 +8,7 @@ spec:
   selector:
     matchLabels:
       app: animatedbook
-  replicas: 3
+  replicas: 1
   template:
     metadata:
       labels:
@@ -17,6 +17,7 @@ spec:
       containers:
       - name: animatedbook
         image: linsun/animatedbook
+        imagePullPolicy: Always
         resources:
           requests:
             cpu: 100m
