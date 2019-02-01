@@ -188,7 +188,7 @@ func getPrimaryTone(value string, headers http.Header) (tone string) {
 	json.NewEncoder(b).Encode(u)
 
 	client := &http.Client{}
-	req, err := http.NewRequest("POST", "http://analyzer.default.svc.cluster.local:80/tone", b)
+	req, err := http.NewRequest("POST", "http://analyzer:80/tone", b)
 	if err != nil {
 		return "Error talking to tone analyzer service: " + err.Error()
 	}
@@ -228,7 +228,7 @@ func getPrimaryTone(value string, headers http.Header) (tone string) {
 		return body[0].ToneName
 	}
 
-	return "No Tone Detected"
+	return "Error - unable to detect Tone from the Analyzer service"
 }
 
 // return the needed header for distributed tracing
