@@ -28,4 +28,4 @@ spec:
           containerPort: 3000
         env:
         - name: VCAP_GIPHY_API_KEY
-          value: ""
+          value: "jyNPNgvgcIYoNWku6wC171WP24Sc5Xl3"

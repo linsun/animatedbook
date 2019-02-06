@@ -277,7 +277,7 @@ func GiphyHandler(rw http.ResponseWriter, req *http.Request) {
 func getGiphyURL(tone string) (string, error) {
 	url := "https://giphy.com/embed/3oKIPs1EVbbNZYq7EA"
 	// TODO read apikey from env var
-	apiKey := ""
+	apiKey := "jyNPNgvgcIYoNWku6wC171WP24Sc5Xl3"
 	if os.Getenv("VCAP_GIPHY_API_KEY") != "" {
 		apiKey = os.Getenv("VCAP_GIPHY_API_KEY")
 	}
