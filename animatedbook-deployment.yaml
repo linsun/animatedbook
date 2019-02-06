@@ -17,7 +17,7 @@ spec:
       serviceAccountName: animatedbook
       containers:
       - name: animatedbook
-        image: linsun/animatedbook
+        image: linsun/animatedbook:v22
         imagePullPolicy: Always
         resources:
           requests:
@@ -26,3 +26,6 @@ spec:
         ports:
         - name: http
           containerPort: 3000
+        env:
+        - name: VCAP_GIPHY_API_KEY
+          value: ""

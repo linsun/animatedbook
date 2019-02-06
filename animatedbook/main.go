@@ -19,9 +19,13 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -49,6 +53,57 @@ type Input struct {
 
 type Tone struct {
 	ToneName string `json:"tone_name"`
+}
+
+// SearchResponse is the response on the Giphy API search
+type SearchResponse struct {
+	Data       []Gif      `json:"data"`
+	Meta       Meta       `json:"meta"`
+	Pagination Pagination `json:"pagination"`
+}
+
+// Meta represents the Giphy API responds
+type Meta struct {
+	Status int    `json:"status"`
+	Msg    string `json:"msg"`
+}
+
+// Pagination allows you to paginate as part of Giphy API search
+type Pagination struct {
+	TotalCount int `json:"total_count"`
+	Count      int `json:"count"`
+	Offset     int `json:"offset"`
+}
+
+// Gif is the standard Giphy Gif object
+type Gif struct {
+	Type             string           `json:"type"`
+	ID               string           `json:"id"`
+	URL              string           `json:"url"`
+	BitlyGifURL      string           `json:"bitly_gif_url"`
+	BitlyURL         string           `json:"bitly_url"`
+	EmbedURL         string           `json:"embed_url"`
+	Username         string           `json:"username"`
+	Source           string           `json:"source"`
+	Rating           string           `json:"rating"`
+	Caption          string           `json:"caption"`
+	ContentURL       string           `json:"content_url"`
+	ImportDatetime   string           `json:"import_datetime"`
+	TrendingDatetime string           `json:"trending_datetime"`
+	Images           map[string]Image `json:"images"`
+}
+
+// Image is a specifically sized gif
+type Image struct {
+	Type     string `json:"type"`
+	URL      string `json:"url"`
+	Width    string `json:"width"`
+	Height   string `json:"height"`
+	Size     string `json:"size"`
+	Mp4      string `json:"mp4"`
+	Mp4Size  string `json:"mp4_size"`
+	Webp     string `json:"webp"`
+	WebpSize string `json:"webp_size"`
 }
 
 func GetList(key string) ([]string, error) {
@@ -166,6 +221,111 @@ func EnvHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write(data)
 }
 
+func GiphyHandler(rw http.ResponseWriter, req *http.Request) {
+	// use this error giphy url as the default
+	url := "https://giphy.com/embed/3oKIPs1EVbbNZYq7EA"
+
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", "http://animatedbook/lrange/guestbook", nil)
+	if err != nil {
+		fmt.Printf("unable to create the new request err" + err.Error())
+	}
+
+	res, err := client.Do(req)
+	if err != nil {
+		fmt.Printf("unable to do the request error " + err.Error())
+	}
+	defer res.Body.Close()
+
+	body := []string{}
+	json.NewDecoder(res.Body).Decode(&body)
+	fmt.Printf("body is %s\n", body)
+
+	// obtain the last entry value
+	if len(body) > 0 {
+		lastEntry := body[len(body)-1]
+		fmt.Printf("last entry is %s\n", lastEntry)
+		// extract the tone
+		start := strings.Index(lastEntry, " : ")
+		end := strings.Index(lastEntry, " (")
+		if end > start {
+			tone := lastEntry[start+3 : end]
+			fmt.Printf("tone is %s\n", tone)
+
+			// get giphy url
+			url, err = getGiphyURL(tone)
+			if err == nil {
+				fmt.Printf("giphy url is %s\n", url)
+			} else {
+				fmt.Printf("unable to get the giphy url " + err.Error())
+			}
+		} else {
+			// unable to find tone, use error giphy
+			fmt.Printf("unable to obtain tone for %s\n", lastEntry)
+		}
+	}
+
+	data, err := json.MarshalIndent(url, "", "")
+	if err != nil {
+		data = []byte("Error marshalling url: " + err.Error() + "\n")
+	}
+
+	rw.Write(data)
+}
+
+// generate giphy url based on tone
+func getGiphyURL(tone string) (string, error) {
+	url := "https://giphy.com/embed/3oKIPs1EVbbNZYq7EA"
+	// TODO read apikey from env var
+	apiKey := ""
+	if os.Getenv("VCAP_GIPHY_API_KEY") != "" {
+		apiKey = os.Getenv("VCAP_GIPHY_API_KEY")
+	}
+
+	// generate a seed for the random number
+	rand.Seed(time.Now().UnixNano())
+	offset := strconv.Itoa(rand.Intn(25))
+	fmt.Printf("offset is %s", offset)
+	// generate giphy based on the value
+	if strings.Contains(tone, "Error - unable to detect Tone from the Analyzer service") {
+		// return an error giphy
+		url = "https://giphy.com/embed/3oKIPs1EVbbNZYq7EA"
+	} else {
+		client := &http.Client{}
+		reqURL := "http://api.giphy.com/v1/gifs/search?q=" + tone + "&api_key=" + apiKey + "&limit=1&offset=" + offset
+		fmt.Printf("request url is %s", reqURL)
+		req, err := http.NewRequest("GET", reqURL, nil)
+		if err != nil {
+			fmt.Printf("create new request err" + err.Error())
+		}
+
+		res, err := client.Do(req)
+		if err != nil {
+			fmt.Printf("unable to do the req " + err.Error())
+		}
+		defer res.Body.Close()
+
+		fmt.Printf("decoding response \n")
+		bodyBytes, err2 := ioutil.ReadAll(res.Body)
+		fmt.Printf("readall" + "\n")
+
+		if err2 == nil {
+			bodyString := string(bodyBytes)
+			res := &SearchResponse{}
+			err := json.Unmarshal([]byte(bodyString), res)
+			if err != nil {
+				log.Fatal(err)
+			}
+			fmt.Printf("%v\n", res.Data[0].EmbedURL)
+
+			url = res.Data[0].EmbedURL
+		} else {
+			fmt.Printf("unable to read the response " + err.Error())
+		}
+	}
+	return url, nil
+}
+
 func HelloHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Write([]byte("Hello from guestbook. " +
 		"Your app is up! (Hostname: " +
@@ -217,7 +377,7 @@ func getPrimaryTone(value string, headers http.Header) (tone string) {
 		} else if body[0].ToneName == "Fear" {
 			return body[0].ToneName + " (ง’̀-‘́)ง"
 		} else if body[0].ToneName == "Sadness" {
-			return body[0].ToneName + " （︶︿︶）"
+			return body[0].ToneName + " (︶︿︶）"
 		} else if body[0].ToneName == "Analytical" {
 			return body[0].ToneName + " ( °□° )"
 		} else if body[0].ToneName == "Confident" {
@@ -254,16 +414,7 @@ func getForwardHeaders(h http.Header) (headers http.Header) {
 
 // Support multiple URL schemes for different use cases
 func findRedisURL() string {
-	host := os.Getenv("REDIS_MASTER_SERVICE_HOST")
-	port := os.Getenv("REDIS_MASTER_SERVICE_PORT")
-	password := os.Getenv("REDIS_MASTER_SERVICE_PASSWORD")
-	master_port := os.Getenv("REDIS_MASTER_PORT")
-
-	if host != "" && port != "" && password != "" {
-		return password + "@" + host + ":" + port
-	} else if master_port != "" {
-		return "redis-master:6379"
-	}
+	// use in memory data store for anumated book
 	return ""
 }
 
@@ -286,6 +437,7 @@ func main() {
 	r.Path("/env").Methods("GET").HandlerFunc(EnvHandler)
 	r.Path("/hello").Methods("GET").HandlerFunc(HelloHandler)
 	r.Path("/healthz").Methods("GET").HandlerFunc(HealthzHandler)
+	r.Path("/giphy").Methods("GET").HandlerFunc(GiphyHandler)
 
 	n := negroni.Classic()
 	n.UseHandler(r)
